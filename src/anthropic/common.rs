@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use crate::anthropic::tools::{ToolResult, ToolUse};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MessageParam {
@@ -19,13 +21,6 @@ impl MessageParam {
             }],
         }
     }
-
-    pub fn assistent(content: Vec<ContentBlockParam>) -> Self {
-        Self {
-            role: Role::Assistant,
-            content,
-        }
-    }
 }
 
 
@@ -34,6 +29,8 @@ impl MessageParam {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlockParam {
     Text { text: String },
+    ToolUse(ToolUse),
+    ToolResult(ToolResult),
     #[serde(other)]
     Unknown,
 }

@@ -2,6 +2,7 @@ use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
 use crate::common;
 use serde::Serialize;
 use serde_json::Value;
+use crate::anthropic::tools::Tool;
 
 #[derive(Debug, Serialize)]
 pub struct Request {
@@ -11,7 +12,8 @@ pub struct Request {
     messages: Vec<MessageParam>,
     system: Vec<ContentBlockParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    output_config: Option<OutputConfig>
+    output_config: Option<OutputConfig>,
+    tools: Vec<Tool>,
 }
 
 impl Request {
@@ -25,16 +27,33 @@ impl Request {
             )],
             system: vec![],
             output_config: None,
+            tools: vec![],
         }
     }
 
-    pub fn message(message: MessageParam, config: OutputConfig) -> Self {
+    pub fn message(message: MessageParam) -> Self {
+        Self::message_with_config(message, None)
+    }
+
+    pub fn message_with_config(message: MessageParam, config: Option<OutputConfig>) -> Self {
         Self {
             model: common::DEFAULT_MODEL.to_string(),
             max_tokens: common::DEFAULT_MAX_TOKEN,
             messages: vec![message],
             system: vec![],
-            output_config: Some(config),
+            output_config: config,
+            tools: vec![],
+        }
+    }
+
+    pub fn message_with_tool(messages: &[MessageParam], tool: Tool) -> Self {
+        Self {
+            model: common::DEFAULT_MODEL.to_string(),
+            max_tokens: common::DEFAULT_MAX_TOKEN,
+            messages: messages.to_vec(),
+            system: vec![],
+            output_config: None,
+            tools: vec![tool],
         }
     }
 
@@ -45,6 +64,7 @@ impl Request {
             messages: message_params.to_vec(),
             system: vec![],
             output_config: None,
+            tools: vec![],
         }
     }
 

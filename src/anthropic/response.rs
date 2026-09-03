@@ -1,6 +1,7 @@
 use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use crate::anthropic::tools::ToolUse;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
@@ -22,25 +23,29 @@ impl Message {
         MessageParam::new(self.role, self.content.clone())
     }
 
-    pub fn text(&self) -> String {
+    pub fn tool_calls(&self) -> Vec<ToolUse> {
         self.content
             .iter()
             .filter_map(|c| match c {
-                ContentBlockParam::Text { text } => Some(text.clone()),
-                ContentBlockParam::Unknown => None,
+                ContentBlockParam::ToolUse(t) => Some(t.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    }
+
+    pub fn text(&self) -> String {
+        self.content
+            .iter()
+            .map(|c| match c {
+                ContentBlockParam::Text { text } => text.clone(),
+                _ => format!("{:?}", c),
             })
             .collect::<Vec<_>>()
             .join("\n")
     }
 
-    pub fn contents(&self) -> Vec<ContentBlockParam> {
-        self.content
-            .iter()
-            .filter_map(|c| match c {
-                ContentBlockParam::Unknown => None,
-                _ => Some(c.clone()),
-            })
-            .collect::<Vec<_>>()
+    pub fn contents(&self) -> Vec<&ContentBlockParam> {
+        self.content.iter().collect::<Vec<_>>()
     }
 
     pub fn usage_io_tokens(&self) -> (u32, u32) {
