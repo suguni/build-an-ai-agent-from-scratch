@@ -4,9 +4,14 @@ use serde_json::{Value, from_str};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
+use std::time::Duration;
+use tavily::Tavily;
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 use time::macros::format_description;
+use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
+use crate::anthropic::response::Message;
+use crate::anthropic::tools::{Tool, ToolUse};
 
 pub mod common;
 pub mod request;
@@ -18,24 +23,71 @@ pub struct Agent {
     turn: u16,
     run: String,
     log_filename: String,
+    messages: Vec<MessageParam>,
+    tools: Vec<Tool>
 }
+
+pub const DEFAULT_MODEL: &str = "claude-haiku-4-5";
+pub const DEFAULT_MAX_TOKEN: u32 = 1024;
 
 const LOG_FILE_NAME: &str = "ring0.jsonl";
 const MESSAGE_URI: &str = "https://api.anthropic.com/v1/messages";
 
 impl Agent {
-    pub fn new(api_key: &str) -> Self {
+    pub fn new(api_key: &str, tools: Vec<Tool>) -> Self {
         Self {
             api_key: api_key.to_string(),
             turn: 1,
             run: get_run().unwrap(),
             log_filename: LOG_FILE_NAME.to_string(),
+            messages: Vec::new(),
+            tools,
         }
     }
 
-    pub async fn call_message(&self, req: &Request) -> anyhow::Result<CallResponse> {
-        let client = reqwest::Client::new();
+    pub async fn chat(&mut self, message: &str) -> anyhow::Result<String> {
+        let user_chat = MessageParam::user(message);
+        self.messages.push(user_chat);
 
+        let message = loop {
+            let request = Request::create(
+                DEFAULT_MODEL,
+                DEFAULT_MAX_TOKEN,
+                self.messages.clone(),
+                vec![],
+                None,
+                self.tools.iter().map(|t| t.clone()).collect::<Vec<_>>(),
+            );
+
+            let response = self.call(&request).await?;
+            if !response.is_success {
+                anyhow::bail!("응답 오류 status: {}, response: {}", response.status, response.raw_body);
+            }
+
+            let message = from_str::<Message>(&response.raw_body).context("응답 deserialize 실패")?;
+            self.messages.push(message.message_param());
+
+            if message.next_tool_use() {
+                let tool_result = self.use_tool(&message);
+                self.messages.push(tool_result);
+            } else {
+                break message
+            }
+        };
+        
+        Ok(message.text())
+    }
+
+    fn use_tool(&self, message: &Message) -> MessageParam {
+        let tool_results = message.tool_calls()
+            .into_iter()
+            .filter_map(|tool_use| { if let Some(t) = tool_use.run() { Some(ContentBlockParam::ToolResult(t)) } else { None } })
+            .collect::<Vec<_>>();
+        MessageParam::new(Role::User, tool_results)
+    }
+
+    pub async fn call(&self, req: &Request) -> anyhow::Result<CallResponse> {
+        let client = reqwest::Client::new();
         self.log_request(&req)?;
 
         let response = client

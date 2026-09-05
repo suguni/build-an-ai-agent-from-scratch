@@ -11,7 +11,7 @@ pub struct Message {
     model: String,
     role: Role,
     stop_details: Option<Value>,
-    stop_reason: String,
+    stop_reason: Option<StopReason>,
     stop_sequence: Option<String>,
     #[serde(rename = "type")]
     kind: ResponseType,
@@ -21,6 +21,17 @@ pub struct Message {
 impl Message {
     pub fn message_param(&self) -> MessageParam {
         MessageParam::new(self.role, self.content.clone())
+    }
+
+    pub fn next_tool_use(&self) -> bool {
+        if let Some(r) = &self.stop_reason {
+            match r {
+                StopReason::ToolUse => true,
+                _ => false,
+            }
+        } else {
+            false
+        }
     }
 
     pub fn tool_calls(&self) -> Vec<ToolUse> {
@@ -74,6 +85,18 @@ pub struct ResponseUsageCacheCreation {
 #[serde(rename_all = "snake_case")]
 pub enum ResponseType {
     Message,
+}
+
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum StopReason {
+    EndTurn,
+    MaxTokens,
+    StopSequence,
+    ToolUse,
+    PauseTurn,
+    Refusal,
+    ModelContextWindowExceeded,
 }
 
 #[cfg(test)]
