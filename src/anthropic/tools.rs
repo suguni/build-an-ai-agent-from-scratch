@@ -1,11 +1,15 @@
 pub mod calculator;
+pub mod tavily;
 
-use schemars::{JsonSchema, schema_for};
+use crate::anthropic::tools::calculator::Calculator;
+use anyhow::bail;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::anthropic::tools::calculator::Calculator;
 
 pub use crate::anthropic::tools::calculator::calculator_tool;
+use crate::anthropic::tools::tavily::SearchWeb;
+pub use crate::anthropic::tools::tavily::tavily_tool;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ToolUse {
@@ -21,19 +25,22 @@ pub struct ToolResult {
 }
 
 impl ToolUse {
-    pub fn run(self) -> Option<ToolResult> {
-        if self.name == "calculator".to_string() {
-            if let Ok(c) = serde_json::from_value::<Calculator>(self.input) {
-                Some(ToolResult {
-                    tool_use_id: self.id.clone(),
-                    content: format!("{}", c.calculate()),
-                })
-            } else {
-                None
-            }
+    pub async fn run(self) -> anyhow::Result<ToolResult> {
+        let content = if self.name == "calculator".to_string() {
+            let c = serde_json::from_value::<Calculator>(self.input)?;
+            format!("{}", c.calculate()?)
+        } else if self.name == "search_web".to_string() {
+            let search = serde_json::from_value::<SearchWeb>(self.input)?;
+            format!("{}", search.search().await?)
         } else {
-            None
-        }
+            eprintln!("unknown tool {}", self.name);
+            bail!("unknown tool {}", self.name);
+        };
+
+        Ok(ToolResult {
+            tool_use_id: self.id.clone(),
+            content,
+        })
     }
 }
 

@@ -14,15 +14,16 @@ use crate::anthropic::Agent;
 use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
 use crate::anthropic::request::Request;
 use crate::anthropic::response::Message;
-use crate::anthropic::tools::calculator_tool;
+use crate::anthropic::tools::{calculator_tool, tavily_tool};
 
 mod anthropic;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let api_key = get_api_key()?;
-    let mut agent = Agent::new(&api_key, vec![calculator_tool()]);
-    let response = agent.chat("What is 1234 x 5678 ?").await?;
+    let system_prompt = "You are a helpful assistant. Use the search tool when you need current information.";
+    let mut agent = Agent::new(&api_key, vec![calculator_tool(), tavily_tool()], system_prompt);
+    let response = agent.chat("Who won the 2025 Nobel Prize in Physics?").await?;
     println!("{response}");
     Ok(())
 }

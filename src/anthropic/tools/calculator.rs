@@ -1,6 +1,7 @@
-use schemars::{schema_for, JsonSchema};
-use serde::Deserialize;
 use crate::anthropic::tools::Tool;
+use anyhow::bail;
+use schemars::{JsonSchema, schema_for};
+use serde::Deserialize;
 
 pub fn calculator_tool() -> Tool {
     Tool {
@@ -27,12 +28,18 @@ pub enum CalculatorOperator {
 }
 
 impl Calculator {
-    pub fn calculate(&self) -> f64 {
+    pub fn calculate(&self) -> anyhow::Result<f64> {
         match self.operator {
-            CalculatorOperator::Add => self.first_number + self.second_number,
-            CalculatorOperator::Subtract => self.first_number - self.second_number,
-            CalculatorOperator::Multiply => self.first_number * self.second_number,
-            CalculatorOperator::Divide => self.first_number / self.second_number,
+            CalculatorOperator::Add => Ok(self.first_number + self.second_number),
+            CalculatorOperator::Subtract => Ok(self.first_number - self.second_number),
+            CalculatorOperator::Multiply => Ok(self.first_number * self.second_number),
+            CalculatorOperator::Divide => {
+                if self.second_number != 0.0 {
+                    Ok(self.first_number / self.second_number)
+                } else {
+                    bail!("tool Calculator - divide by zero")
+                }
+            }
         }
     }
 }

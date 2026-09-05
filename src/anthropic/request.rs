@@ -48,50 +48,6 @@ impl Request {
             tools: vec![],
         }
     }
-
-    pub fn message(message: MessageParam) -> Self {
-        Self::message_with_config(message, None)
-    }
-
-    pub fn message_with_config(message: MessageParam, config: Option<OutputConfig>) -> Self {
-        Self {
-            model: DEFAULT_MODEL,
-            max_tokens: DEFAULT_MAX_TOKEN,
-            messages: vec![message],
-            system: vec![],
-            output_config: config,
-            tools: vec![],
-        }
-    }
-
-    pub fn message_with_tool(messages: &[MessageParam], tool: Tool) -> Self {
-        Self {
-            model: DEFAULT_MODEL,
-            max_tokens: DEFAULT_MAX_TOKEN,
-            messages: messages.to_vec(),
-            system: vec![],
-            output_config: None,
-            tools: vec![tool],
-        }
-    }
-
-    pub fn messages(message_params: &[MessageParam]) -> Self {
-        Self {
-            model: DEFAULT_MODEL,
-            max_tokens: DEFAULT_MAX_TOKEN,
-            messages: message_params.to_vec(),
-            system: vec![],
-            output_config: None,
-            tools: vec![],
-        }
-    }
-
-    pub fn config(schema: Value) -> OutputConfig {
-        OutputConfig {
-            effort: None,
-            format: Some(JSONOutputFormat::JsonSchema { schema }),
-        }
-    }
 }
 
 #[derive(Debug, Serialize)]

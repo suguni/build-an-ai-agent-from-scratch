@@ -1,17 +1,15 @@
+use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
 use crate::anthropic::request::Request;
+use crate::anthropic::response::Message;
+use crate::anthropic::tools::Tool;
 use anyhow::Context;
 use serde_json::{Value, from_str};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::time::Duration;
-use tavily::Tavily;
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 use time::macros::format_description;
-use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
-use crate::anthropic::response::Message;
-use crate::anthropic::tools::{Tool, ToolUse};
 
 pub mod common;
 pub mod request;
@@ -24,7 +22,8 @@ pub struct Agent {
     run: String,
     log_filename: String,
     messages: Vec<MessageParam>,
-    tools: Vec<Tool>
+    tools: Vec<Tool>,
+    system_prompt: String,
 }
 
 pub const DEFAULT_MODEL: &str = "claude-haiku-4-5";
@@ -34,7 +33,7 @@ const LOG_FILE_NAME: &str = "ring0.jsonl";
 const MESSAGE_URI: &str = "https://api.anthropic.com/v1/messages";
 
 impl Agent {
-    pub fn new(api_key: &str, tools: Vec<Tool>) -> Self {
+    pub fn new(api_key: &str, tools: Vec<Tool>, system_prompt: &str) -> Self {
         Self {
             api_key: api_key.to_string(),
             turn: 1,
@@ -42,6 +41,7 @@ impl Agent {
             log_filename: LOG_FILE_NAME.to_string(),
             messages: Vec::new(),
             tools,
+            system_prompt: system_prompt.to_string(),
         }
     }
 
@@ -54,36 +54,44 @@ impl Agent {
                 DEFAULT_MODEL,
                 DEFAULT_MAX_TOKEN,
                 self.messages.clone(),
-                vec![],
+                vec![ContentBlockParam::text(&self.system_prompt)],
                 None,
                 self.tools.iter().map(|t| t.clone()).collect::<Vec<_>>(),
             );
 
             let response = self.call(&request).await?;
             if !response.is_success {
-                anyhow::bail!("응답 오류 status: {}, response: {}", response.status, response.raw_body);
+                anyhow::bail!(
+                    "응답 오류 status: {}, response: {}",
+                    response.status,
+                    response.raw_body
+                );
             }
 
-            let message = from_str::<Message>(&response.raw_body).context("응답 deserialize 실패")?;
+            let message =
+                from_str::<Message>(&response.raw_body).context("응답 deserialize 실패")?;
             self.messages.push(message.message_param());
 
             if message.next_tool_use() {
-                let tool_result = self.use_tool(&message);
+                let tool_result = self.use_tool(&message).await;
                 self.messages.push(tool_result);
             } else {
-                break message
+                break message;
             }
         };
-        
+
         Ok(message.text())
     }
 
-    fn use_tool(&self, message: &Message) -> MessageParam {
-        let tool_results = message.tool_calls()
-            .into_iter()
-            .filter_map(|tool_use| { if let Some(t) = tool_use.run() { Some(ContentBlockParam::ToolResult(t)) } else { None } })
-            .collect::<Vec<_>>();
-        MessageParam::new(Role::User, tool_results)
+    async fn use_tool(&self, message: &Message) -> MessageParam {
+        let mut result = vec![];
+        for tool_use in message.tool_calls() {
+            match tool_use.run().await {
+                Ok(t) => result.push(ContentBlockParam::ToolResult(t)),
+                Err(e) => eprintln!("{:?}", e),
+            }
+        }
+        MessageParam::new(Role::User, result)
     }
 
     pub async fn call(&self, req: &Request) -> anyhow::Result<CallResponse> {
