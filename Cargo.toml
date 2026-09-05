@@ -12,3 +12,4 @@ anyhow = "1"
 dotenvy = "0.15"
 time = { version = "0.3", features = ["formatting", "macros"] }
 schemars = "1.2"
+tavily = "2.1.0"
