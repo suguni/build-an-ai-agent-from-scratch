@@ -1,5 +1,5 @@
 use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
-use crate::anthropic::tools::Tool;
+use crate::anthropic::tools::ToolSpec;
 use serde::Serialize;
 use serde_json::Value;
 use crate::anthropic::{DEFAULT_MAX_TOKEN, DEFAULT_MODEL};
@@ -13,7 +13,7 @@ pub struct Request {
     system: Vec<ContentBlockParam>,
     #[serde(skip_serializing_if = "Option::is_none")]
     output_config: Option<OutputConfig>,
-    tools: Vec<Tool>,
+    tools: Vec<ToolSpec>,
 }
 
 impl Request {
@@ -23,7 +23,7 @@ impl Request {
         messages: Vec<MessageParam>,
         system: Vec<ContentBlockParam>,
         output_config: Option<OutputConfig>,
-        tools: Vec<Tool>,
+        tools: Vec<ToolSpec>,
     ) -> Self {
         Self {
             model,

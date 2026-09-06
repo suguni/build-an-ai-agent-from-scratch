@@ -1,15 +1,16 @@
 pub mod calculator;
-pub mod tavily;
+pub mod search_web;
 
 use crate::anthropic::tools::calculator::Calculator;
 use anyhow::bail;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::pin::Pin;
 
 pub use crate::anthropic::tools::calculator::calculator_tool;
-use crate::anthropic::tools::tavily::SearchWeb;
-pub use crate::anthropic::tools::tavily::tavily_tool;
+use crate::anthropic::tools::search_web::SearchWebInput;
+pub use crate::anthropic::tools::search_web::search_web_tool;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ToolUse {
@@ -18,35 +19,41 @@ pub struct ToolUse {
     input: Value,
 }
 
+impl ToolUse {
+    pub fn find_tool<'a>(&self, tools: &'a [Box<dyn Tool>]) -> Option<&'a dyn Tool> {
+        tools.iter()
+            .find(|&t| t.name() == self.name)
+            .map(|t| t.as_ref())
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ToolResult {
     tool_use_id: String,
     content: String,
 }
 
-impl ToolUse {
-    pub async fn run(self) -> anyhow::Result<ToolResult> {
-        let content = if self.name == "calculator".to_string() {
-            let c = serde_json::from_value::<Calculator>(self.input)?;
-            format!("{}", c.calculate()?)
-        } else if self.name == "search_web".to_string() {
-            let search = serde_json::from_value::<SearchWeb>(self.input)?;
-            format!("{}", search.search().await?)
-        } else {
-            eprintln!("unknown tool {}", self.name);
-            bail!("unknown tool {}", self.name);
-        };
-
-        Ok(ToolResult {
-            tool_use_id: self.id.clone(),
+impl ToolResult {
+    pub fn new(tool_use_id: String, content: String) -> Self {
+        ToolResult {
+            tool_use_id,
             content,
-        })
+        }
     }
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct Tool {
+pub struct ToolSpec {
     name: &'static str,
     description: Option<&'static str>,
     input_schema: Value,
+}
+
+pub trait Tool {
+    fn name(&self) -> &'static str;
+    fn spec(&self) -> ToolSpec;
+    fn run<'a>(
+        &'a self,
+        tool_use: ToolUse,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<ToolResult>> + Send + 'a>>;
 }

@@ -1,5 +1,10 @@
 #![allow(unused)]
 
+use crate::anthropic::Agent;
+use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
+use crate::anthropic::request::Request;
+use crate::anthropic::response::Message;
+use crate::anthropic::tools::{calculator_tool, search_web_tool};
 use anyhow::Context;
 use serde_json::{Value, from_str};
 use std::collections::HashMap;
@@ -10,19 +15,21 @@ use tavily::Tavily;
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 use time::macros::format_description;
-use crate::anthropic::Agent;
-use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
-use crate::anthropic::request::Request;
-use crate::anthropic::response::Message;
-use crate::anthropic::tools::{calculator_tool, tavily_tool};
 
 mod anthropic;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let api_key = get_api_key()?;
-    let system_prompt = "You are a helpful assistant. Use the search tool when you need current information.";
-    let mut agent = Agent::new(&api_key, vec![calculator_tool(), tavily_tool()], system_prompt);
+    let system_prompt =
+        "You are a helpful assistant. Use the search tool when you need current information. Answer with Korean.";
+    let mut agent = Agent::new(
+        &api_key,
+        vec![Box::new(calculator_tool()), Box::new(search_web_tool())],
+        system_prompt,
+    );
+    // what is 1234 times 5678 ?
+    // Who won the 2025 Nobel Prize in Physics?
     let response = agent.chat("Who won the 2025 Nobel Prize in Physics?").await?;
     println!("{response}");
     Ok(())

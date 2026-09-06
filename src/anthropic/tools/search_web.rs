@@ -1,21 +1,47 @@
-use crate::anthropic::tools::Tool;
+use crate::anthropic::tools::{Tool, ToolResult, ToolSpec, ToolUse};
 use anyhow::Context;
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::pin::Pin;
 use std::time::Duration;
 use tavily::{SearchRequest, SearchResult, Tavily};
 
-pub fn tavily_tool() -> Tool {
-    Tool {
-        name: "search_web",
-        description: Some("Search the web for the given query."),
-        input_schema: schema_for!(SearchWeb).to_value(),
+pub struct SearchWeb {}
+
+pub fn search_web_tool() -> impl Tool {
+    SearchWeb {}
+}
+
+impl Tool for SearchWeb {
+    fn name(&self) -> &'static str {
+        "search_web"
+    }
+
+    fn spec(&self) -> ToolSpec {
+        ToolSpec {
+            name: "search_web",
+            description: Some("Search the web for the given query."),
+            input_schema: schema_for!(SearchWebInput).to_value(),
+        }
+    }
+
+    fn run(
+        &self,
+        tool_use: ToolUse,
+    ) -> Pin<Box<dyn Future<Output = anyhow::Result<ToolResult>> + Send + '_>> {
+        Box::pin(async move {
+            let search = serde_json::from_value::<SearchWebInput>(tool_use.input)?;
+            search
+                .search()
+                .await
+                .map(|r| ToolResult::new(tool_use.id, format!("{}", r)))
+        })
     }
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct SearchWeb {
+pub struct SearchWebInput {
     query: String,
     max_result: i32,
     topic: Topic,
@@ -28,7 +54,7 @@ pub struct SearchWeb {
 enum Topic {
     General,
     News,
-    Finance
+    Finance,
 }
 
 impl Topic {
@@ -41,7 +67,7 @@ impl Topic {
     }
 }
 
-impl SearchWeb {
+impl SearchWebInput {
     pub async fn search(&self) -> anyhow::Result<String> {
         dotenvy::dotenv()?;
 

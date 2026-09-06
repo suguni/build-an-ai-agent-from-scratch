@@ -1,7 +1,7 @@
 use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
 use crate::anthropic::request::Request;
 use crate::anthropic::response::Message;
-use crate::anthropic::tools::Tool;
+use crate::anthropic::tools::{Tool, ToolSpec};
 use anyhow::Context;
 use serde_json::{Value, from_str};
 use std::collections::HashMap;
@@ -22,7 +22,7 @@ pub struct Agent {
     run: String,
     log_filename: String,
     messages: Vec<MessageParam>,
-    tools: Vec<Tool>,
+    tools: Vec<Box<dyn Tool>>,
     system_prompt: String,
 }
 
@@ -32,8 +32,9 @@ pub const DEFAULT_MAX_TOKEN: u32 = 1024;
 const LOG_FILE_NAME: &str = "ring0.jsonl";
 const MESSAGE_URI: &str = "https://api.anthropic.com/v1/messages";
 
-impl Agent {
-    pub fn new(api_key: &str, tools: Vec<Tool>, system_prompt: &str) -> Self {
+impl Agent
+{
+    pub fn new(api_key: &str, tools: Vec<Box<dyn Tool>>, system_prompt: &str) -> Self {
         Self {
             api_key: api_key.to_string(),
             turn: 1,
@@ -56,7 +57,7 @@ impl Agent {
                 self.messages.clone(),
                 vec![ContentBlockParam::text(&self.system_prompt)],
                 None,
-                self.tools.iter().map(|t| t.clone()).collect::<Vec<_>>(),
+                self.tools.iter().map(|t| t.spec()).collect::<Vec<_>>(),
             );
 
             let response = self.call(&request).await?;
@@ -86,9 +87,13 @@ impl Agent {
     async fn use_tool(&self, message: &Message) -> MessageParam {
         let mut result = vec![];
         for tool_use in message.tool_calls() {
-            match tool_use.run().await {
-                Ok(t) => result.push(ContentBlockParam::ToolResult(t)),
-                Err(e) => eprintln!("{:?}", e),
+            if let Some(tool) = tool_use.find_tool(&self.tools) {
+                match tool.run(tool_use).await {
+                    Ok(t) => result.push(ContentBlockParam::ToolResult(t)),
+                    Err(e) => eprintln!("{:?}", e),
+                }
+            } else {
+                eprintln!("cannot find tool {:?}", tool_use);
             }
         }
         MessageParam::new(Role::User, result)
