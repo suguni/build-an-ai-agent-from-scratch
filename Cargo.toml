@@ -14,3 +14,4 @@ time = { version = "0.3", features = ["formatting", "macros"] }
 schemars = "1.2"
 tavily = "2.1.0"
 thiserror = "2.0.20"
+rmcp = { version = "3", features = ["client", "macros", "transport-child-process"] }
