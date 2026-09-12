@@ -1,6 +1,5 @@
+use crate::agent::tools::{ToolResult, ToolUse};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use crate::anthropic::tools::{ToolResult, ToolUse};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MessageParam {

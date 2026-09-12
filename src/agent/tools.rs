@@ -1,16 +1,13 @@
 pub mod calculator;
 pub mod search_web;
 
-use crate::anthropic::tools::calculator::Calculator;
-use anyhow::bail;
+pub use crate::agent::tools::calculator::calculator_tool;
+pub use crate::agent::tools::search_web::search_web_tool;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::pin::Pin;
-
-pub use crate::anthropic::tools::calculator::calculator_tool;
-use crate::anthropic::tools::search_web::SearchWebInput;
-pub use crate::anthropic::tools::search_web::search_web_tool;
+use thiserror::Error;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ToolUse {
@@ -24,6 +21,10 @@ impl ToolUse {
         tools.iter()
             .find(|&t| t.name() == self.name)
             .map(|t| t.as_ref())
+    }
+
+    pub fn error_result(&self, message: &str) -> ToolResult {
+        ToolResult::new(self.id.clone(), message.to_string())
     }
 }
 
@@ -55,5 +56,15 @@ pub trait Tool {
     fn run<'a>(
         &'a self,
         tool_use: ToolUse,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<ToolResult>> + Send + 'a>>;
+    ) -> Pin<Box<dyn Future<Output = Result<ToolResult, ToolError>> + Send + 'a>>;
+}
+
+#[derive(Debug, Error)]
+#[error("id: {tool_use_id}, cause: {cause}")]
+pub struct ToolError { tool_use_id: String, cause: anyhow::Error }
+
+impl ToolError {
+    pub fn tool_result(&self) -> ToolResult {
+        ToolResult { tool_use_id: self.tool_use_id.clone(), content: self.cause.to_string() }
+    }
 }

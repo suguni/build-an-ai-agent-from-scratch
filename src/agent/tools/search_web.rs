@@ -1,4 +1,4 @@
-use crate::anthropic::tools::{Tool, ToolResult, ToolSpec, ToolUse};
+use crate::agent::tools::{Tool, ToolError, ToolResult, ToolSpec, ToolUse};
 use anyhow::Context;
 use schemars::{JsonSchema, schema_for};
 use serde::{Deserialize, Serialize};
@@ -29,12 +29,15 @@ impl Tool for SearchWeb {
     fn run(
         &self,
         tool_use: ToolUse,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<ToolResult>> + Send + '_>> {
+    ) -> Pin<Box<dyn Future<Output = Result<ToolResult, ToolError>> + Send + '_>> {
         Box::pin(async move {
-            let search = serde_json::from_value::<SearchWebInput>(tool_use.input)?;
+            let search = serde_json::from_value::<SearchWebInput>(tool_use.input)
+                .map_err(|e| ToolError { tool_use_id: tool_use.id.clone(), cause: anyhow::Error::new(e) })?;
+
             search
                 .search()
                 .await
+                .map_err(|e| ToolError { tool_use_id: tool_use.id.clone(), cause: e })
                 .map(|r| ToolResult::new(tool_use.id, format!("{}", r)))
         })
     }

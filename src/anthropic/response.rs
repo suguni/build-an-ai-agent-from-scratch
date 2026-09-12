@@ -1,7 +1,7 @@
+use crate::agent::tools::ToolUse;
 use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::anthropic::tools::ToolUse;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Message {
@@ -22,7 +22,7 @@ impl Message {
     pub fn message_param(&self) -> MessageParam {
         MessageParam::new(self.role, self.content.clone())
     }
-
+    
     pub fn next_tool_use(&self) -> bool {
         if let Some(r) = &self.stop_reason {
             match r {

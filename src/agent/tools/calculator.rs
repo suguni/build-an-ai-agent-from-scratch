@@ -1,5 +1,5 @@
-use crate::anthropic::tools::{Tool, ToolResult, ToolSpec, ToolUse};
-use anyhow::bail;
+use crate::agent::tools::{Tool, ToolError, ToolResult, ToolSpec, ToolUse};
+use anyhow::{anyhow, bail};
 use schemars::{JsonSchema, schema_for};
 use serde::Deserialize;
 use std::pin::Pin;
@@ -26,10 +26,13 @@ impl Tool for Calculator {
     fn run(
         &self,
         tool_use: ToolUse,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<ToolResult>> + Send + '_>> {
+    ) -> Pin<Box<dyn Future<Output = Result<ToolResult, ToolError>> + Send + '_>> {
         Box::pin(async move {
-            let c = serde_json::from_value::<CalculatorInput>(tool_use.input)?;
+            let c = serde_json::from_value::<CalculatorInput>(tool_use.input)
+                .map_err(|e| ToolError { tool_use_id: tool_use.id.clone(), cause: anyhow::Error::new(e) })?;
+
             c.calculate()
+                .map_err(|e| ToolError { tool_use_id: tool_use.id.clone(), cause: e })
                 .map(|r| ToolResult::new(tool_use.id, format!("{}", r)))
         })
     }

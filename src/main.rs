@@ -1,36 +1,25 @@
 #![allow(unused)]
 
-use crate::anthropic::Agent;
-use crate::anthropic::common::{ContentBlockParam, MessageParam, Role};
-use crate::anthropic::request::Request;
-use crate::anthropic::response::Message;
-use crate::anthropic::tools::{calculator_tool, search_web_tool};
+use agent::tools::{calculator_tool, search_web_tool};
 use anyhow::Context;
-use serde_json::{Value, from_str};
-use std::collections::HashMap;
-use std::fs::File;
 use std::io::Write;
-use std::time::Duration;
-use tavily::Tavily;
-use time::OffsetDateTime;
-use time::format_description::well_known::Rfc3339;
-use time::macros::format_description;
 
-mod anthropic;
+pub mod anthropic;
+pub mod agent;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let api_key = get_api_key()?;
     let system_prompt =
         "You are a helpful assistant. Use the search tool when you need current information. Answer with Korean.";
-    let mut agent = Agent::new(
+    let mut agent = agent::Agent::new(
         &api_key,
         vec![Box::new(calculator_tool()), Box::new(search_web_tool())],
         system_prompt,
     );
     // what is 1234 times 5678 ?
     // Who won the 2025 Nobel Prize in Physics?
-    let response = agent.chat("Who won the 2025 Nobel Prize in Physics?").await?;
+    let response = agent.chat("If marathon runner Eliud Kipchoge could maintain his world record pace indefinitely, how long would it take him to reach the Moon?").await?;
     println!("{response}");
     Ok(())
 }
