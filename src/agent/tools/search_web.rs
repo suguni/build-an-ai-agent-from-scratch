@@ -13,8 +13,8 @@ pub struct SearchWeb {
 }
 
 pub fn search_web_tool() -> anyhow::Result<impl Tool> {
-    dotenvy::dotenv()?;
-    let api_key = std::env::var("TAVILY_API_KEY").context("TAVILY_API_KEY 가져오기 실패")?;
+    let api_key = std::env::var("TAVILY_API_KEY")
+        .context("TAVILY_API_KEY 가져오기 실패")?;
     let tavily_client = TavilyClient::new(&api_key)?;
     Ok(SearchWeb { tavily_client })
 }

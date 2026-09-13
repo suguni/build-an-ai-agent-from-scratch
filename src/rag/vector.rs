@@ -4,13 +4,15 @@ pub fn fixed_length_chunking(
     text: &str,
     chunk_size: usize,
     overlap: usize
-) -> Vec<&str> {
-    let mut chunks: Vec<&str> = vec![];
+) -> Vec<String> {
+    let text = text.as_bytes();
+    let mut chunks: Vec<String> = vec![];
     let mut start = 0;
 
     while start < text.len() {
         let end = usize::min(start + chunk_size, text.len());
-        chunks.push(&text[start..end]);
+        let chunk = String::from_utf8_lossy(&text[start..end]);
+        chunks.push(chunk.to_string());
         if end == text.len() {
             break;
         }

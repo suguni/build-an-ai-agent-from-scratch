@@ -15,13 +15,14 @@ impl HttpClient {
         HttpClient {}
     }
 
-    pub async fn embedding(&self, input: &[&str]) -> reqwest::Result<OllamaResponse> {
+    pub async fn embedding<R: AsRef<str> + Serialize>(&self, input: &[R]) -> reqwest::Result<OllamaResponse> {
         let client = reqwest::Client::new();
+        let input = input.as_ref();
         let response = client
             .post(API_EMBEDDING)
             .json(&json!({
                 "model": EMBEDDING_MODEL,
-                "input": input
+                "input": input 
             }))
             .send()
             .await?;
