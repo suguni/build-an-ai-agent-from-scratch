@@ -6,11 +6,17 @@ use serde_json::Value;
 use std::pin::Pin;
 use std::time::Duration;
 use tavily::{SearchRequest, SearchResult, Tavily};
+use crate::agent::tools::tavily_client::TavilyClient;
 
-pub struct SearchWeb {}
+pub struct SearchWeb {
+    tavily_client: TavilyClient,
+}
 
-pub fn search_web_tool() -> impl Tool {
-    SearchWeb {}
+pub fn search_web_tool() -> anyhow::Result<impl Tool> {
+    dotenvy::dotenv()?;
+    let api_key = std::env::var("TAVILY_API_KEY").context("TAVILY_API_KEY 가져오기 실패")?;
+    let tavily_client = TavilyClient::new(&api_key)?;
+    Ok(SearchWeb { tavily_client })
 }
 
 impl Tool for SearchWeb {
@@ -35,7 +41,7 @@ impl Tool for SearchWeb {
                 .map_err(|e| ToolError { tool_use_id: tool_use.id.clone(), cause: anyhow::Error::new(e) })?;
 
             search
-                .search()
+                .search(&self.tavily_client)
                 .await
                 .map_err(|e| ToolError { tool_use_id: tool_use.id.clone(), cause: e })
                 .map(|r| ToolResult::new(tool_use.id, format!("{}", r)))
@@ -71,42 +77,12 @@ impl Topic {
 }
 
 impl SearchWebInput {
-    pub async fn search(&self) -> anyhow::Result<String> {
-        dotenvy::dotenv()?;
-
-        let api_key = std::env::var("TAVILY_API_KEY").context("TAVILY_API_KEY 가져오기 실패")?;
-
-        let client = Tavily::builder(&api_key)
-            .timeout(Duration::from_secs(60))
-            .max_retries(5)
-            .build()?;
-
-        let mut req = SearchRequest::new(api_key, &self.query)
+    pub async fn search(&self, tavily_client: &TavilyClient) -> anyhow::Result<String> {
+        let req = tavily_client
+            .new_request(&self.query)
             .max_results(self.max_result)
             .topic(self.topic.as_str());
-
-        let result = client.call(&req).await.map(|it| {
-            it.results
-                .into_iter()
-                .map(|s| MySearchResult {
-                    title: s.title,
-                    url: s.url,
-                    content: s.content,
-                    raw_content: s.raw_content,
-                    score: s.score,
-                })
-                .collect::<Vec<_>>()
-        })?;
-
+        let result = tavily_client.search(&req).await?;
         serde_json::to_string(&result).context("검색 결과 serialize 실패")
     }
-}
-
-#[derive(Debug, Serialize)]
-struct MySearchResult {
-    pub title: String,
-    pub url: String,
-    pub content: String,
-    pub raw_content: Option<String>,
-    pub score: f32,
 }

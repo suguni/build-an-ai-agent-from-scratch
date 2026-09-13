@@ -1,5 +1,6 @@
 pub mod calculator;
 pub mod search_web;
+pub mod tavily_client;
 
 pub use crate::agent::tools::calculator::calculator_tool;
 pub use crate::agent::tools::search_web::search_web_tool;

@@ -11,8 +11,8 @@ pub mod rag;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    vector_search().await?;
-    // chat().await
+    // vector_search().await?;
+    chat().await?;
     Ok(())
 }
 
@@ -59,7 +59,7 @@ async fn chat() -> anyhow::Result<()> {
         "You are a helpful assistant. Use the search tool when you need current information. Answer with Korean.";
     let mut agent = agent::Agent::new(
         &api_key,
-        vec![Box::new(calculator_tool()), Box::new(search_web_tool())],
+        vec![Box::new(calculator_tool()), Box::new(search_web_tool()?)],
         system_prompt,
     );
     // what is 1234 times 5678 ?
